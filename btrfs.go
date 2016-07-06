@@ -6,9 +6,13 @@ import (
 )
 
 const (
+	// BtrfsCommand is the name of the btrfs command-line tool binary.
 	BtrfsCommand = "btrfs"
 )
 
+// Snapshot creates a Btrfs snapshot of src at dst, optionally making
+// it writable. If dst already exists, the snapshot is not created and
+// an error is returned.
 func Snapshot(src, dst string, rw bool) error {
 	args := make([]string, 0, 6)
 	args = append(args, "btrfs", "subvolume", "snapshot")

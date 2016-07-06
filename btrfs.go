@@ -40,6 +40,8 @@ func Snapshot(src, dst string, rw bool) error {
 	return btrfs.Run()
 }
 
+// A SnapshotDestExistsError is returned by Snapshot if the
+// destination already exists.
 type SnapshotDestExistsError struct {
 	Dest string
 }

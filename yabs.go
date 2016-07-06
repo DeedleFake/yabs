@@ -15,7 +15,7 @@ func globalUsage(flagSet *flag.FlagSet) {
 	fmt.Fprintln(os.Stderr)
 
 	fmt.Fprintln(os.Stderr, `Commands:
-  update
+  update <timeline config name>
         Updates a snapshot timeline.
 
 Follow a command with --help for more detailed information.`)
@@ -28,10 +28,15 @@ func main() {
 
 	flagSet := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	flagSet.Usage = func() { globalUsage(flagSet) }
-	flagSet.StringVar(&flags.cRoot, "c", "/etc/yabs/snaps.d/", "The dir to look for configs in.")
+	flagSet.StringVar(&flags.cRoot, "c", "/etc/yabs/timeline.d/", "The dir to look for configs in.")
 	flagSet.Parse(os.Args[1:])
 
 	switch cmd := flagSet.Arg(0); cmd {
+	case "update":
+		(&Update{
+			root: flags.cRoot,
+		}).Main(flagSet.Args())
+
 	case "help", "":
 		flagSet.Usage()
 		os.Exit(2)

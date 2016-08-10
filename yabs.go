@@ -53,7 +53,18 @@ func timelines(root string) ([]string, error) {
 }
 
 func update(ctx context.Context, cpath string) error {
-	panic("Not implemented.")
+	file, err := os.Open(cpath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	cfg, err := LoadConfig(file)
+	if err != nil {
+		return err
+	}
+
+	return cfg.Update(ctx)
 }
 
 func main() {
@@ -124,8 +135,9 @@ func main() {
 		err := update(ctx, filepath.Join(flags.configRoot, timeline))
 		if err != nil {
 			L.E.Printf("Failed to update %q: %v", timeline, err)
+			return
 		}
 
-		L.I.Printf("Update %q.", timeline)
+		L.I.Printf("Updated %q.", timeline)
 	}
 }

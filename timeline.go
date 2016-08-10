@@ -1,7 +1,10 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"io"
+	"time"
 
 	"github.com/naoina/toml"
 )
@@ -11,30 +14,67 @@ type Config struct {
 	Source string `toml:"source"`
 	Dest   string `toml:"dest"`
 
-	Regular struct {
-		NameScheme string `toml:"namescheme"`
-		Writable   bool   `toml:"writable"`
-	} `toml:"regular"`
+	NameScheme string `toml:"namescheme"`
+	UTC        bool   `toml:"utc"`
+	Writable   bool   `toml:"writable"`
+
+	Allowed ConfigAllowed `toml:"allowed"`
+}
+
+type ConfigAllowed struct {
+	Age string `toml:"age"`
+	Num string `toml:"num"`
 }
 
 // LoadConfig loads a new Config from r.
 func LoadConfig(r io.Reader) (*Config, error) {
 	d := toml.NewDecoder(r)
 
-	var cfg Config
-	err := d.Decode(&cfg)
-	return &cfg, err
+	cfg := &Config{
+		NameScheme: "Stamp",
+
+		Allowed: ConfigAllowed{
+			Age: "1000h",
+			Num: "100",
+		},
+	}
+	err := d.Decode(cfg)
+	return cfg, err
 }
 
-// A Timeline stores information about the current state of a
-// timeline. It's methods and fields allow operations on a timeline,
-// such as creating new snapshots, finding existing ones, and deleting
-// them.
-type Timeline struct {
-}
+func (cfg *Config) Update(ctx context.Context) error {
+	if cfg.Source == "" {
+		return errors.New("Config has no source specified.")
+	}
+	if cfg.Dest == "" {
+		return errors.New("Config has no destination specified.")
+	}
 
-// Timeline loads a Timeline from a Config. This is the main way of
-// obtaining a valid Timeline.
-func (cfg *Config) Timeline() (*Timeline, error) {
 	panic("Not implemented.")
+}
+
+var timeNames = map[string]string{
+	"ANSIC":       time.ANSIC,
+	"UnixDate":    time.UnixDate,
+	"RubyDate":    time.RubyDate,
+	"RFC822":      time.RFC822,
+	"RFC822Z":     time.RFC822Z,
+	"RFC850":      time.RFC850,
+	"RFC1123":     time.RFC1123,
+	"RFC1123Z":    time.RFC1123Z,
+	"RFC3339":     time.RFC3339,
+	"RFC3339Nano": time.RFC3339Nano,
+	"Kitchen":     time.Kitchen,
+	"Stamp":       time.Stamp,
+	"StampMilli":  time.StampMilli,
+	"StampMicro":  time.StampMicro,
+	"StampNano":   time.StampNano,
+}
+
+func FormatTime(t time.Time, f string) string {
+	if n, ok := timeNames[f]; ok {
+		f = n
+	}
+
+	return t.Format(f)
 }

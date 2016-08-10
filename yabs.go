@@ -1,49 +1,131 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
+	"log"
 	"os"
+	"path/filepath"
+	"sort"
+	"sync"
 )
 
-func globalUsage(flagSet *flag.FlagSet) {
-	fmt.Fprintf(os.Stderr, "Usage: %v [global options] <command> [command options]\n", os.Args[0])
-	fmt.Fprintln(os.Stderr)
+var L = struct {
+	I *log.Logger
+	E *log.Logger
+}{
+	I: log.New(os.Stdout, "[INFO] ", log.LstdFlags),
+	E: log.New(os.Stderr, "[ERROR] ", log.LstdFlags),
+}
 
-	fmt.Fprintln(os.Stderr, "Global options:")
-	flagSet.PrintDefaults()
-	fmt.Fprintln(os.Stderr)
+func timelines(root string) ([]string, error) {
+	dir, err := os.Open(root)
+	if err != nil {
+		return nil, err
+	}
+	defer dir.Close()
 
-	fmt.Fprintln(os.Stderr, `Commands:
-  update <timeline config name>
-        Updates a snapshot timeline.
+	fi, err := dir.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if !fi.IsDir() {
+		return nil, fmt.Errorf("%q is not a directory", root)
+	}
 
-Follow a command with --help for more detailed information.`)
+	c, err := dir.Readdir(-1)
+	if err != nil {
+		return nil, err
+	}
+	sort.Sort(FileInfoByName(c))
+
+	list := make([]string, 0, len(c))
+	for _, entry := range c {
+		if !entry.Mode().IsRegular() {
+			continue
+		}
+
+		list = append(list, entry.Name())
+	}
+
+	return list, nil
+}
+
+func update(ctx context.Context, cpath string) error {
+	panic("Not implemented.")
 }
 
 func main() {
 	var flags struct {
-		cRoot string
+		configRoot string
+	}
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %v [options] <timeline>\n", os.Args[0])
+		fmt.Fprintln(os.Stderr)
+
+		fmt.Fprintln(os.Stderr, "Options:")
+		flag.PrintDefaults()
+		fmt.Fprintln(os.Stderr)
+
+		fmt.Fprintln(os.Stderr, "Pseudo timelines:")
+		fmt.Fprintln(os.Stderr, "  list-timelines")
+		fmt.Fprintln(os.Stderr, "      List all timeline configs.")
+		fmt.Fprintln(os.Stderr, "  update-all")
+		fmt.Fprintln(os.Stderr, "      Update all timelines.")
+	}
+	flag.StringVar(&flags.configRoot, "confdir", "/etc/yabs/", "The directory that the timeline configs are in.")
+	flag.Parse()
+
+	if flag.NArg() != 1 {
+		flag.Usage()
+		os.Exit(2)
 	}
 
-	flagSet := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-	flagSet.Usage = func() { globalUsage(flagSet) }
-	flagSet.StringVar(&flags.cRoot, "c", "/etc/yabs/timeline.d/", "The dir to look for configs in.")
-	flagSet.Parse(os.Args[1:])
+	ctx := SignalContext(context.Background(), os.Interrupt)
 
-	switch cmd := flagSet.Arg(0); cmd {
-	case "update":
-		(&Update{
-			root: flags.cRoot,
-		}).Main(flagSet.Args())
+	switch timeline := flag.Arg(0); timeline {
+	case "list-timelines":
+		tl, err := timelines(flags.configRoot)
+		if err != nil {
+			L.E.Printf("Failed to get list of timelines: %v", err)
+			os.Exit(1)
+		}
 
-	case "help", "":
-		flagSet.Usage()
-		os.Exit(2)
+		for _, tl := range tl {
+			fmt.Println(tl)
+		}
+
+	case "update-all":
+		tl, err := timelines(flags.configRoot)
+		if err != nil {
+			L.E.Printf("Failed to get list of timelines: %v", err)
+			os.Exit(1)
+		}
+
+		var wg sync.WaitGroup
+		for _, tl := range tl {
+			wg.Add(1)
+			go func(tl string) {
+				defer wg.Done()
+
+				err := update(ctx, filepath.Join(flags.configRoot, tl))
+				if err != nil {
+					L.E.Printf("Failed to update %q: %v", tl, err)
+					return
+				}
+
+				L.I.Printf("Updated %q.", tl)
+			}(tl)
+		}
+		wg.Wait()
 
 	default:
-		fmt.Fprintf(os.Stderr, "Unknown command: %q\n", cmd)
-		flagSet.Usage()
-		os.Exit(2)
+		err := update(ctx, filepath.Join(flags.configRoot, timeline))
+		if err != nil {
+			L.E.Printf("Failed to update %q: %v", timeline, err)
+		}
+
+		L.I.Printf("Update %q.", timeline)
 	}
 }

@@ -59,7 +59,7 @@ func (cfg *Config) Update(ctx context.Context) error {
 
 	err := CreateSnapshot(ctx,
 		cfg.Source,
-		filepath.Join(cfg.Dest, FormatTime(now, cfg.NameFormat)),
+		filepath.Join(cfg.Dest, now.Format(TimeFormat(cfg.NameFormat))),
 		cfg.Writable,
 	)
 	if err != nil {
@@ -109,7 +109,10 @@ func (cfg *Config) deleteByNum(ctx context.Context) error {
 	if len(c) < cfg.Allowed.Num {
 		return nil
 	}
-	sort.Sort(FileInfoByModTime(c))
+	sort.Sort(FileInfoByTimestamp{
+		fi: c,
+		f:  TimeFormat(cfg.NameFormat),
+	})
 
 	return cfg.delete(ctx, c[cfg.Allowed.Num:])
 }
@@ -131,7 +134,10 @@ func (cfg *Config) deleteByAge(ctx context.Context, now time.Time) error {
 	if err != nil {
 		return err
 	}
-	sort.Sort(FileInfoByModTime(c))
+	sort.Sort(FileInfoByTimestamp{
+		fi: c,
+		f:  TimeFormat(cfg.NameFormat),
+	})
 
 	newest := now.Add(-age)
 	first := sort.Search(len(c), func(i int) bool {
@@ -162,10 +168,10 @@ var timeNames = map[string]string{
 	"StampNano":   time.StampNano,
 }
 
-func FormatTime(t time.Time, f string) string {
+func TimeFormat(f string) string {
 	if n, ok := timeNames[f]; ok {
-		f = n
+		return n
 	}
 
-	return t.Format(f)
+	return f
 }

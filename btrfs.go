@@ -26,8 +26,8 @@ func CreateSnapshot(ctx context.Context, src, dst string, rw bool) error {
 		return err
 	}
 
-	args := make([]string, 0, 6)
-	args = append(args, "btrfs", "subvolume", "snapshot")
+	args := make([]string, 0, 5)
+	args = append(args, "subvolume", "snapshot")
 	if !rw {
 		args = append(args, "-r")
 	}
@@ -40,7 +40,7 @@ func CreateSnapshot(ctx context.Context, src, dst string, rw bool) error {
 }
 
 func DeleteSubvol(ctx context.Context, path string) error {
-	btrfs := exec.CommandContext(ctx, BtrfsCommand, "-c", path)
+	btrfs := exec.CommandContext(ctx, BtrfsCommand, "subvolume", "delete", "-c", path)
 	btrfs.Stderr = os.Stderr
 
 	return btrfs.Run()

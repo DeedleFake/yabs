@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/signal"
+	"time"
 )
 
 func SignalContext(ctx context.Context, sig ...os.Signal) context.Context {
@@ -38,16 +39,22 @@ func (fi FileInfoByName) Less(i1, i2 int) bool {
 	return fi[i1].Name() < fi[i2].Name()
 }
 
-type FileInfoByModTime []os.FileInfo
-
-func (fi FileInfoByModTime) Len() int {
-	return len(fi)
+type FileInfoByTimestamp struct {
+	fi []os.FileInfo
+	f  string
 }
 
-func (fi FileInfoByModTime) Swap(i1, i2 int) {
-	fi[i1], fi[i2] = fi[i2], fi[i1]
+func (fi FileInfoByTimestamp) Len() int {
+	return len(fi.fi)
 }
 
-func (fi FileInfoByModTime) Less(i1, i2 int) bool {
-	return fi[i1].ModTime().After(fi[i2].ModTime())
+func (fi FileInfoByTimestamp) Swap(i1, i2 int) {
+	fi.fi[i1], fi.fi[i2] = fi.fi[i2], fi.fi[i1]
+}
+
+func (fi FileInfoByTimestamp) Less(i1, i2 int) bool {
+	t1, _ := time.Parse(fi.f, fi.fi[i1].Name())
+	t2, _ := time.Parse(fi.f, fi.fi[i2].Name())
+
+	return t1.After(t2)
 }

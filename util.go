@@ -4,7 +4,7 @@ import (
 	"context"
 	"os"
 	"os/signal"
-	"time"
+	"path/filepath"
 )
 
 func SignalContext(ctx context.Context, sig ...os.Signal) context.Context {
@@ -39,22 +39,29 @@ func (fi FileInfoByName) Less(i1, i2 int) bool {
 	return fi[i1].Name() < fi[i2].Name()
 }
 
-type FileInfoByTimestamp struct {
-	fi []os.FileInfo
-	f  string
+type FileInfoByCTime struct {
+	fi   []os.FileInfo
+	root string
 }
 
-func (fi FileInfoByTimestamp) Len() int {
+func (fi FileInfoByCTime) Len() int {
 	return len(fi.fi)
 }
 
-func (fi FileInfoByTimestamp) Swap(i1, i2 int) {
+func (fi FileInfoByCTime) Swap(i1, i2 int) {
 	fi.fi[i1], fi.fi[i2] = fi.fi[i2], fi.fi[i1]
 }
 
-func (fi FileInfoByTimestamp) Less(i1, i2 int) bool {
-	t1, _ := time.Parse(fi.f, fi.fi[i1].Name())
-	t2, _ := time.Parse(fi.f, fi.fi[i2].Name())
+func (fi FileInfoByCTime) Less(i1, i2 int) bool {
+	t1, err := SubvolCTime(context.TODO(), filepath.Join(fi.root, fi.fi[i1].Name()))
+	if err != nil {
+		return true
+	}
+
+	t2, err := SubvolCTime(context.TODO(), filepath.Join(fi.root, fi.fi[i2].Name()))
+	if err != nil {
+		return false
+	}
 
 	return t1.After(t2)
 }

@@ -1,10 +1,14 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
+	"time"
 )
 
 const (
@@ -44,6 +48,31 @@ func DeleteSubvol(ctx context.Context, path string) error {
 	btrfs.Stderr = os.Stderr
 
 	return btrfs.Run()
+}
+
+func SubvolCTime(ctx context.Context, path string) (time.Time, error) {
+	btrfs := exec.CommandContext(ctx, BtrfsCommand, "subvolume", "show", path)
+	out, err := btrfs.Output()
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	scan := bufio.NewScanner(bytes.NewReader(out))
+	for scan.Scan() {
+		fields := bytes.Fields(scan.Bytes())
+		if len(fields) < 2 {
+			continue
+		}
+
+		if bytes.Equal(fields[0], []byte("Creation time:")) {
+			return time.Parse(
+				"2006-01-02 15:04:05 -0700",
+				string(bytes.Join(fields[1:], []byte(" "))),
+			)
+		}
+	}
+
+	return time.Time{}, errors.New("Unable to find creation time")
 }
 
 // A SnapshotDestExistsError is returned by Snapshot if the

@@ -109,9 +109,9 @@ func (cfg *Config) deleteByNum(ctx context.Context) error {
 	if len(c) < cfg.Allowed.Num {
 		return nil
 	}
-	sort.Sort(FileInfoByTimestamp{
-		fi: c,
-		f:  TimeFormat(cfg.NameFormat),
+	sort.Sort(FileInfoByCTime{
+		fi:   c,
+		root: cfg.Dest,
 	})
 
 	return cfg.delete(ctx, c[cfg.Allowed.Num:])
@@ -134,14 +134,19 @@ func (cfg *Config) deleteByAge(ctx context.Context, now time.Time) error {
 	if err != nil {
 		return err
 	}
-	sort.Sort(FileInfoByTimestamp{
-		fi: c,
-		f:  TimeFormat(cfg.NameFormat),
+	sort.Sort(FileInfoByCTime{
+		fi:   c,
+		root: cfg.Dest,
 	})
 
 	newest := now.Add(-age)
 	first := sort.Search(len(c), func(i int) bool {
-		return c[i].ModTime().Before(newest)
+		t, err := SubvolCTime(ctx, filepath.Join(cfg.Dest, c[i].Name()))
+		if err != nil {
+			return false
+		}
+
+		return t.Before(newest)
 	})
 	if first == len(c) {
 		return nil

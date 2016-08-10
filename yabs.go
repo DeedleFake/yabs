@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/user"
 	"path/filepath"
 	"sort"
 	"sync"
@@ -68,6 +69,14 @@ func update(ctx context.Context, cpath string) error {
 }
 
 func main() {
+	u, err := user.Current()
+	if err != nil {
+		L.E.Fatalf("Failed to get current user: %v", err)
+	}
+	if u.Uid != "0" {
+		L.E.Fatalf("%v must be run as root.", os.Args[0])
+	}
+
 	var flags struct {
 		configRoot string
 	}
@@ -99,8 +108,7 @@ func main() {
 	case "list-timelines":
 		tl, err := timelines(flags.configRoot)
 		if err != nil {
-			L.E.Printf("Failed to get list of timelines: %v", err)
-			os.Exit(1)
+			L.E.Fatalf("Failed to get list of timelines: %v", err)
 		}
 
 		for _, tl := range tl {
@@ -110,8 +118,7 @@ func main() {
 	case "update-all":
 		tl, err := timelines(flags.configRoot)
 		if err != nil {
-			L.E.Printf("Failed to get list of timelines: %v", err)
-			os.Exit(1)
+			L.E.Fatalf("Failed to get list of timelines: %v", err)
 		}
 
 		var wg sync.WaitGroup
@@ -134,7 +141,7 @@ func main() {
 	default:
 		err := update(ctx, filepath.Join(flags.configRoot, timeline))
 		if err != nil {
-			L.E.Printf("Failed to update %q: %v", timeline, err)
+			L.E.Fatalf("Failed to update %q: %v", timeline, err)
 			return
 		}
 

@@ -4,7 +4,12 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
+	"sort"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/naoina/toml"
 )
@@ -14,7 +19,7 @@ type Config struct {
 	Source string `toml:"source"`
 	Dest   string `toml:"dest"`
 
-	NameScheme string `toml:"namescheme"`
+	NameFormat string `toml:"nameformat"`
 	UTC        bool   `toml:"utc"`
 	Writable   bool   `toml:"writable"`
 
@@ -22,8 +27,8 @@ type Config struct {
 }
 
 type ConfigAllowed struct {
+	Num int    `toml:"num"`
 	Age string `toml:"age"`
-	Num string `toml:"num"`
 }
 
 // LoadConfig loads a new Config from r.
@@ -31,11 +36,11 @@ func LoadConfig(r io.Reader) (*Config, error) {
 	d := toml.NewDecoder(r)
 
 	cfg := &Config{
-		NameScheme: "Stamp",
+		NameFormat: "Stamp",
 
 		Allowed: ConfigAllowed{
-			Age: "1000h",
-			Num: "100",
+			Num: -1,
+			Age: "3000h",
 		},
 	}
 	err := d.Decode(cfg)
@@ -50,7 +55,93 @@ func (cfg *Config) Update(ctx context.Context) error {
 		return errors.New("Config has no destination specified.")
 	}
 
-	panic("Not implemented.")
+	now := time.Now()
+
+	err := CreateSnapshot(ctx,
+		cfg.Source,
+		filepath.Join(cfg.Dest, FormatTime(now, cfg.NameFormat)),
+		cfg.Writable,
+	)
+	if err != nil {
+		return err
+	}
+
+	err = cfg.deleteByNum(ctx)
+	if err != nil {
+		return err
+	}
+
+	err = cfg.deleteByAge(ctx, now)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (cfg *Config) delete(ctx context.Context, del []os.FileInfo) error {
+	eg, ctx := errgroup.WithContext(ctx)
+	for _, del := range del {
+		func(del string) {
+			eg.Go(func() error {
+				return DeleteSubvol(ctx, del)
+			})
+		}(filepath.Join(cfg.Dest, del.Name()))
+	}
+	return eg.Wait()
+}
+
+func (cfg *Config) deleteByNum(ctx context.Context) error {
+	if cfg.Allowed.Num <= 0 {
+		return nil
+	}
+
+	dir, err := os.Open(cfg.Dest)
+	if err != nil {
+		return err
+	}
+	defer dir.Close()
+
+	c, err := dir.Readdir(-1)
+	if err != nil {
+		return err
+	}
+	if len(c) < cfg.Allowed.Num {
+		return nil
+	}
+	sort.Sort(FileInfoByModTime(c))
+
+	return cfg.delete(ctx, c[cfg.Allowed.Num:])
+}
+
+func (cfg *Config) deleteByAge(ctx context.Context, now time.Time) error {
+	age, err := time.ParseDuration(cfg.Allowed.Age)
+	if err != nil {
+		// Skip deleting by age if duration is invalid.
+		return nil
+	}
+
+	dir, err := os.Open(cfg.Dest)
+	if err != nil {
+		return err
+	}
+	defer dir.Close()
+
+	c, err := dir.Readdir(-1)
+	if err != nil {
+		return err
+	}
+	sort.Sort(FileInfoByModTime(c))
+
+	newest := now.Add(-age)
+	first := sort.Search(len(c), func(i int) bool {
+		return c[i].ModTime().Before(newest)
+	})
+	if first == len(c) {
+		return nil
+	}
+
+	return cfg.delete(ctx, c[first:])
 }
 
 var timeNames = map[string]string{

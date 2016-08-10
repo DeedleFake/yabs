@@ -37,3 +37,17 @@ func (fi FileInfoByName) Swap(i1, i2 int) {
 func (fi FileInfoByName) Less(i1, i2 int) bool {
 	return fi[i1].Name() < fi[i2].Name()
 }
+
+type FileInfoByModTime []os.FileInfo
+
+func (fi FileInfoByModTime) Len() int {
+	return len(fi)
+}
+
+func (fi FileInfoByModTime) Swap(i1, i2 int) {
+	fi[i1], fi[i2] = fi[i2], fi[i1]
+}
+
+func (fi FileInfoByModTime) Less(i1, i2 int) bool {
+	return fi[i1].ModTime().After(fi[i2].ModTime())
+}

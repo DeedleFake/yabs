@@ -15,7 +15,7 @@ const (
 // Snapshot creates a Btrfs snapshot of src at dst, optionally making
 // it writable. If dst already exists, the snapshot is not created and
 // an error is returned.
-func Snapshot(ctx context.Context, src, dst string, rw bool) error {
+func CreateSnapshot(ctx context.Context, src, dst string, rw bool) error {
 	_, err := os.Stat(dst)
 	switch {
 	case os.IsNotExist(err):
@@ -34,6 +34,14 @@ func Snapshot(ctx context.Context, src, dst string, rw bool) error {
 	args = append(args, src, dst)
 
 	btrfs := exec.CommandContext(ctx, BtrfsCommand, args...)
+	btrfs.Stderr = os.Stderr
+
+	return btrfs.Run()
+}
+
+func DeleteSubvol(ctx context.Context, path string) error {
+	btrfs := exec.CommandContext(ctx, BtrfsCommand, "-c", path)
+	btrfs.Stderr = os.Stderr
 
 	return btrfs.Run()
 }

@@ -53,8 +53,15 @@ func (fi FileInfoByTimestamp) Swap(i1, i2 int) {
 }
 
 func (fi FileInfoByTimestamp) Less(i1, i2 int) bool {
-	t1, _ := time.Parse(fi.f, fi.fi[i1].Name())
-	t2, _ := time.Parse(fi.f, fi.fi[i2].Name())
+	t1, err := time.Parse(fi.f, fi.fi[i1].Name())
+	if err != nil {
+		return true
+	}
+
+	t2, err := time.Parse(fi.f, fi.fi[i2].Name())
+	if err != nil {
+		return false
+	}
 
 	return t1.After(t2)
 }

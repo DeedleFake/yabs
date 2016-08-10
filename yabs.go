@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"sort"
 	"sync"
+
+	"golang.org/x/sys/unix"
 )
 
 var L = struct {
@@ -102,7 +104,10 @@ func main() {
 		os.Exit(2)
 	}
 
-	ctx := SignalContext(context.Background(), os.Interrupt)
+	ctx := SignalContext(context.Background(),
+		os.Interrupt,
+		unix.SIGTERM,
+	)
 
 	switch timeline := flag.Arg(0); timeline {
 	case "list-timelines":

@@ -71,10 +71,10 @@ func (cfg *Config) Update(ctx context.Context) error {
 		return err
 	}
 
-	err = cfg.deleteByAge(ctx, now)
-	if err != nil {
-		return err
-	}
+	//err = cfg.deleteByAge(ctx, now)
+	//if err != nil {
+	//	return err
+	//}
 
 	return nil
 }
